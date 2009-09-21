@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<project name="Commons JS2J">
+  <body>
+
+    <menu name="Commons JS2J">
+      <item name="Overview" href="/index.html" />
+    </menu>
+
+    <menu name="Development">
+      <item name="Mailing Lists"           href="/mail-lists.html"/>
+      <item name="Issue Tracking"          href="/issue-tracking.html"/>
+      <item name="Team"                    href="/team-list.html"/>
+      <item name="Source Repository"       href="/source-repository.html"/>
+      <item name="Javadoc (latest)"        href="/apidocs/index.html"/>
+    </menu>
+
+  </body>
+</project>
