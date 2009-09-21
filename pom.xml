@@ -5,7 +5,7 @@
 
   <groupId>org.twdata.js2j</groupId>
   <artifactId>js2j</artifactId>
-  <version>0.1</version>
+  <version>0.2-SNAPSHOT</version>
   <name>JavaScript to Java Integration</name>
   <description>A set of Javascript extensions to better integrate with Java</description>
 
