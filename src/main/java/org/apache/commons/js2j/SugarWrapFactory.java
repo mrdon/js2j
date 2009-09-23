@@ -19,11 +19,7 @@ package org.apache.commons.js2j;
 import java.io.FileReader;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ImporterTopLevel;
@@ -36,49 +32,42 @@ import org.mozilla.javascript.WrapFactory;
  */
 public class SugarWrapFactory extends WrapFactory {
     
-    private List functionRegistry = new ArrayList();
-    private Map functionMappings = new HashMap();
-    private Class dynabeanClass;
-    
+    private final List<ExtensionEntry> functionRegistry;
+
     public SugarWrapFactory() {
+        this(Collections.<Class>emptyList());
+    }
+    public SugarWrapFactory(List<Class> extensionClasses) {
         super();
-        
+
+        List<ExtensionEntry> entries = new ArrayList<ExtensionEntry>();
         // Add default methods
-        addExtensionFunctions(CollectionExtensions.class);
-        addExtensionFunctions(ListExtensions.class);
-        addExtensionFunctions(FileExtensions.class);
-        addExtensionFunctions(PropertiesExtensions.class);
-        addExtensionFunctions(InputStreamExtensions.class);
-        
-        try {
-            dynabeanClass = Class.forName("org.apache.commons.beanutils.DynaBean");
-        } catch (ClassNotFoundException e) {
-            // Dynabeans not detected
+        entries.addAll(addExtensionFunctions(CollectionExtensions.class));
+        entries.addAll(addExtensionFunctions(ListExtensions.class));
+        entries.addAll(addExtensionFunctions(FileExtensions.class));
+        entries.addAll(addExtensionFunctions(PropertiesExtensions.class));
+        entries.addAll(addExtensionFunctions(InputStreamExtensions.class));
+
+        for (Class cls : extensionClasses)
+        {
+            entries.addAll(addExtensionFunctions(cls));
         }
+
+        functionRegistry = Collections.unmodifiableList(entries);
     }
     
-    public void addExtensionFunction(Class cls, String name, Method func) {
-        int modifier = func.getModifiers();
-        if (Modifier.isStatic(modifier) && Modifier.isPublic(modifier)) {
-            ExtensionEntry entry = new ExtensionEntry(cls, name, func);
-            functionRegistry.add(entry);
-        } else {
-            throw new IllegalArgumentException("Method "+func+" must be static and public");
-        }
-    }
-    
-    public void addExtensionFunctions(Class holder) {
-        Method[] methods = holder.getDeclaredMethods();
-        for (int x=0; x<methods.length; x++) {
-            int modifier = methods[x].getModifiers();
+    private List<ExtensionEntry> addExtensionFunctions(Class holder) {
+        List<ExtensionEntry> registry = new ArrayList<ExtensionEntry>();
+        for (Method method : holder.getDeclaredMethods()) {
+            int modifier = method.getModifiers();
             if (Modifier.isStatic(modifier) && Modifier.isPublic(modifier)) {
-                String name = methods[x].getName();
-                Class target = methods[x].getParameterTypes()[0];
-                ExtensionEntry entry = new ExtensionEntry(target, name, methods[x]);
-                functionRegistry.add(entry);
+                String name = method.getName();
+                Class target = method.getParameterTypes()[0];
+                ExtensionEntry entry = new ExtensionEntry(target, name, method);
+                registry.add(entry);
             }
         }
-        
+        return registry;
     }
 
     /**
@@ -98,31 +87,29 @@ public class SugarWrapFactory extends WrapFactory {
      */
     public Scriptable wrapAsJavaObject(Context cx, Scriptable scope,
         Object javaObject, Class staticType) {
-            
+
         Map map = getExtensionFunctions(javaObject.getClass());
         Scriptable wrap = null;
         if (javaObject instanceof Map) {
             wrap = new ScriptableMap(scope, javaObject, staticType, map);
         } else if (javaObject instanceof List) {
             wrap = new ScriptableList(scope, javaObject, staticType, map);
-        } else if (dynabeanClass != null && dynabeanClass.isAssignableFrom(javaObject.getClass())) {
-            wrap = new ScriptableDynaBean(scope, javaObject, staticType, map);
         } else {
-            wrap = new JavaObjectWrapper(scope, javaObject, staticType, map);
+            if (map == null || map.isEmpty()) {
+                wrap = super.wrapAsJavaObject(cx, scope, javaObject, staticType);
+            } else {
+                wrap = new JavaObjectWrapper(scope, javaObject, staticType, map);
+            }
         }
+
         return wrap;
     }
     
     private Map getExtensionFunctions(Class cls) {
-        Map map = (Map)functionMappings.get(cls);
-        ExtensionEntry entry;
-        if (map == null) {
-            map = new HashMap();
-            for (Iterator i = functionRegistry.iterator(); i.hasNext(); ) {
-                entry = (ExtensionEntry)i.next();
-                if (entry.clazz.isAssignableFrom(cls)) {
-                    map.put(entry.name, entry.function);
-                }
+        Map<String, Method> map = new HashMap<String, Method>();
+        for (ExtensionEntry entry : functionRegistry) {
+            if (entry.clazz.isAssignableFrom(cls)) {
+                map.put(entry.name, entry.function);
             }
         }
         return map;
